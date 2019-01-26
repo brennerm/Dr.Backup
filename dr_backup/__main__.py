@@ -172,7 +172,7 @@ class DockerRegistryBackup:
         self.__backup_path = f'{registry_key}_{timestamp}.tar'
 
 
-    def backup(self):
+    def backup(self, overwrite_existing):
         if self.__backup_path is None:
             self.__set_default_backup_path()
 
@@ -211,7 +211,8 @@ class DockerRegistryBackup:
                         layer_data = self.__registry.download_layer(repo, digest)
                         f.write(layer_data)
 
-        with tarfile.open(self.__backup_path, 'x') as f:
+        mode = 'w' if overwrite_existing else 'x'
+        with tarfile.open(self.__backup_path, mode) as f:
             f.add(layers_path, LAYERS_FOLDER)
             f.add(manifests_path, MANIFESTS_FOLDER)
 
@@ -266,6 +267,7 @@ def main():
 
     backup_group = argparser.add_argument_group('backup')
     backup_group.add_argument('-o', '--output', type=str, help='path the backup will be saved to (default: ./${registry_url}_${timestamp})')
+    backup_group.add_argument('-f', '--force', action='store_true', default=False, help='force overwrite of existing backup file (default: False)')
 
     restore_group = argparser.add_argument_group('restore')
     restore_group.add_argument('-s', '--source', type=str, help='path pointing to the backup file we will restore from')
@@ -285,7 +287,7 @@ def main():
     registry = DockerRegistry(args.registry_url, args.username, args.password, args.disable_ssl_verification)
     backup = DockerRegistryBackup(registry, args.output if args.output else args.source)
     if args.backup:
-        backup.backup()
+        backup.backup(args.force)
     elif args.restore:
         backup.restore()
 
