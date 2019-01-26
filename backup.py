@@ -144,13 +144,16 @@ class DockerRegistryBackup:
 
     def backup(self):
         images = self.__registry.get_all_images()
+        repos_n = len(images)
+
         layers_path = os.path.join(
             self.__backup_path,
             LAYERS_FOLDER
         )
         os.makedirs(layers_path, exist_ok=True)
 
-        for repo, tags in images.items():
+        for i, (repo, tags) in enumerate(images.items(), 1):
+            tags_n = len(tags)
             manifests_path = os.path.join(
                 self.__backup_path,
                 MANIFESTS_FOLDER,
@@ -158,7 +161,9 @@ class DockerRegistryBackup:
             )
             os.makedirs(manifests_path, exist_ok=True)
 
-            for tag in tags:
+            for j, tag in enumerate(tags, 1):
+                print(f'\r\033[K[{i}/{repos_n}] {repo} [{j}/{tags_n}] {tag}', end='') # \033[K ANSI escape character that erases to end of line
+
                 manifest = self.__registry.get_manifest(repo, tag)
                 with open(os.path.join(manifests_path, tag + '.json'), 'w') as f:
                     json.dump(manifest, f)
