@@ -3,16 +3,29 @@
 import argparse
 import json
 import os
+import ssl
 import urllib.request
 
 LAYERS_FOLDER = 'layers'
 MANIFESTS_FOLDER = 'manifests'
 
 class DockerRegistry:
-    def __init__(self, url, username=None, password=None):
+    def __init__(self, url, username=None, password=None, disable_ssl_verification=False):
         self.__url = url
-        self.__username = username
-        self.__password = password
+
+        if username and password:
+            DockerRegistry.__install_basic_auth_handler(url, username, password)
+
+        if disable_ssl_verification:
+            ssl._create_default_https_context = ssl._create_unverified_context
+
+    @staticmethod
+    def __install_basic_auth_handler(url, username, password):
+        password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+        password_mgr.add_password(None, url, username, password)
+        handler = urllib.request.HTTPBasicAuthHandler(password_mgr)
+        opener = urllib.request.build_opener(handler)
+        urllib.request.install_opener(opener)
 
     def __make_raw_request(self, *args, **kwargs):
         request = urllib.request.Request(*args, **kwargs)
@@ -112,7 +125,7 @@ class DockerRegistry:
         data = json.dumps(manifest, indent=4).encode()
         
         try:
-            response = self.__make_raw_request(
+            self.__make_raw_request(
                 f'{self.__url}/v2/{repo}/manifests/{tag}',
                 method='PUT',
                 headers={
@@ -203,10 +216,13 @@ if __name__ == "__main__":
     restore_group = argparser.add_argument_group('restore')
     restore_group.add_argument('-s', '--source', type=str, help='path pointing to the backup file we will restore from')
 
+    argparser.add_argument('--disable-ssl-verification', action='store_true', help="disable SSL verification")
+    argparser.add_argument('-u', '--username', help="username to authenticate against registry")
+    argparser.add_argument('-p', '--password', help="password to authenticate against registry")
     argparser.add_argument('registry_url')
     args = argparser.parse_args()
 
-    registry = DockerRegistry(args.registry_url)
+    registry = DockerRegistry(args.registry_url, args.username, args.password, args.disable_ssl_verification)
     backup = DockerRegistryBackup(registry, args.output if args.output else args.source)
     if args.backup:
         backup.backup()
