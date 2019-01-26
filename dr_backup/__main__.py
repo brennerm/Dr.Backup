@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import getpass
 import json
 import os
 import ssl
@@ -228,11 +229,17 @@ def main():
     restore_group = argparser.add_argument_group('restore')
     restore_group.add_argument('-s', '--source', type=str, help='path pointing to the backup file we will restore from')
 
-    argparser.add_argument('--disable-ssl-verification', action='store_true', help="disable SSL verification")
-    argparser.add_argument('-u', '--username', help="username to authenticate against registry")
+    argparser.add_argument('--disable-ssl-verification', action='store_true', help="disable SSL verification (default: False)")
+    argparser.add_argument('-u', '--username', help="username to authenticate against registry, provide password with -p or you'll be prompted")
     argparser.add_argument('-p', '--password', help="password to authenticate against registry")
     argparser.add_argument('registry_url')
     args = argparser.parse_args()
+
+    if args.restore and args.source is None:
+        argparser.error('--source is required when restoring')
+
+    if args.username and args.password is None:
+        args.password = getpass.getpass()
 
     registry = DockerRegistry(args.registry_url, args.username, args.password, args.disable_ssl_verification)
     backup = DockerRegistryBackup(registry, args.output if args.output else args.source)
