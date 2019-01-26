@@ -2,10 +2,13 @@
 
 import argparse
 import base64
+import datetime
 import getpass
 import json
 import os
 import ssl
+import tarfile
+import tempfile
 import urllib.request
 
 LAYERS_FOLDER = 'layers'
@@ -19,6 +22,10 @@ class DockerRegistry:
 
         if disable_ssl_verification:
             ssl._create_default_https_context = ssl._create_unverified_context
+
+    @property
+    def url(self):
+        return self.__url
 
     def __make_raw_request(self, *args, **kwargs):
         if self.__username and self.__password:
@@ -150,34 +157,48 @@ class DockerRegistry:
 
 
 class DockerRegistryBackup:
-    def __init__(self, registry, backup_path):
+    def __init__(self, registry, backup_path=None):
         self.__registry = registry
         self.__backup_path = backup_path
 
+    def __set_default_backup_path(self):
+        url = urllib.parse.urlparse(self.__registry.url)
+
+        registry_key = f'{url.netloc}{url.path}'
+        registry_key = registry_key.replace('/', '_')
+
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
+
+        self.__backup_path = f'{registry_key}_{timestamp}.tar'
+
+
     def backup(self):
+        if self.__backup_path is None:
+            self.__set_default_backup_path()
+
+        backup_dir = tempfile.TemporaryDirectory()
+
         images = self.__registry.get_all_images()
         repos_n = len(images)
 
-        layers_path = os.path.join(
-            self.__backup_path,
-            LAYERS_FOLDER
-        )
+        layers_path = os.path.join(backup_dir.name,LAYERS_FOLDER)
+        manifests_path = os.path.join(backup_dir.name, MANIFESTS_FOLDER)
         os.makedirs(layers_path, exist_ok=True)
+        os.makedirs(manifests_path, exist_ok=True)
 
         for i, (repo, tags) in enumerate(images.items(), 1):
             tags_n = len(tags)
-            manifests_path = os.path.join(
-                self.__backup_path,
-                MANIFESTS_FOLDER,
+            repo_path = os.path.join(
+                manifests_path,
                 repo
             )
-            os.makedirs(manifests_path, exist_ok=True)
+            os.makedirs(repo_path, exist_ok=True)
 
             for j, tag in enumerate(tags, 1):
                 print(f'\r\033[K[{i}/{repos_n}] {repo} [{j}/{tags_n}] {tag}', end='') # \033[K ANSI escape character that erases to end of line
 
                 manifest = self.__registry.get_manifest(repo, tag)
-                with open(os.path.join(manifests_path, tag + '.json'), 'w') as f:
+                with open(os.path.join(repo_path, tag + '.json'), 'w') as f:
                     json.dump(manifest, f)
 
                 digests = self.__registry.get_all_digests(repo, tag)
@@ -190,13 +211,22 @@ class DockerRegistryBackup:
                         layer_data = self.__registry.download_layer(repo, digest)
                         f.write(layer_data)
 
+        with tarfile.open(self.__backup_path, 'x') as f:
+            f.add(layers_path, LAYERS_FOLDER)
+            f.add(manifests_path, MANIFESTS_FOLDER)
+
     def restore(self):
+        restore_dir = tempfile.TemporaryDirectory()
+
+        with tarfile.open(self.__backup_path, 'r') as f:
+            f.extractall(restore_dir.name)
+
         layers_path = os.path.join(
-            self.__backup_path,
+            restore_dir.name,
             LAYERS_FOLDER
         )
         manifests_path = os.path.join(
-            self.__backup_path,
+            restore_dir.name,
             MANIFESTS_FOLDER
         )
 
@@ -235,7 +265,7 @@ def main():
     group.add_argument('-r', '--restore', action='store_true')
 
     backup_group = argparser.add_argument_group('backup')
-    backup_group.add_argument('-o', '--output', type=str, help='path the backup will be saved to')
+    backup_group.add_argument('-o', '--output', type=str, help='path the backup will be saved to (default: ./${registry_url}_${timestamp})')
 
     restore_group = argparser.add_argument_group('restore')
     restore_group.add_argument('-s', '--source', type=str, help='path pointing to the backup file we will restore from')
