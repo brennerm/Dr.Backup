@@ -9,7 +9,7 @@ setup(
             'dr-backup = dr_backup.__main__:main',
         ],
     },
-    url='https://github.com/brennerm/docker-registry-backup',
+    url='https://github.com/brennerm/Dr.Backup',
     license='MIT',
     author='brennerm',
     author_email='xamrennerb@gmail.com',
