@@ -188,10 +188,17 @@ class DockerRegistryBackup:
             MANIFESTS_FOLDER
         )
 
-        for repo in os.listdir(manifests_path):
+        repos = os.listdir(manifests_path)
+        repos_n = len(repos)
+        for i, repo in enumerate(repos, 1):
             repo_path = os.path.join(manifests_path, repo)
-            for manifest_name in os.listdir(repo_path):
+            manifest_names = os.listdir(repo_path)
+            tags_n = len(manifest_names)
+
+            for j, manifest_name in enumerate(manifest_names, 1):
                 tag = manifest_name.rsplit('.', maxsplit=1)[0]
+                print(f'\r\033[K[{i}/{repos_n}] {repo} [{j}/{tags_n}] {tag}', end='') # \033[K ANSI escape character that erases to end of line
+
                 manifest_path = os.path.join(repo_path, manifest_name)
                 with open(manifest_path, 'r') as f:
                     manifest = json.load(f)
