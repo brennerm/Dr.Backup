@@ -213,9 +213,9 @@ class DockerRegistryBackup:
                     self.__registry.upload_layer(repo, layer['digest'], layer_data)
 
                 self.__registry.upload_manifest(repo, tag, manifest)
-            
 
-if __name__ == "__main__":
+
+def main():
     argparser = argparse.ArgumentParser()
 
     group = argparser.add_mutually_exclusive_group(required=True)
@@ -240,3 +240,8 @@ if __name__ == "__main__":
         backup.backup()
     elif args.restore:
         backup.restore()
+
+
+
+if __name__ == "__main__":
+    main()
