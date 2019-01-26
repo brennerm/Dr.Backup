@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import base64
 import getpass
 import json
 import os
@@ -13,25 +14,37 @@ MANIFESTS_FOLDER = 'manifests'
 class DockerRegistry:
     def __init__(self, url, username=None, password=None, disable_ssl_verification=False):
         self.__url = url
-
-        if username and password:
-            DockerRegistry.__install_basic_auth_handler(url, username, password)
+        self.__username = username
+        self.__password = password
 
         if disable_ssl_verification:
             ssl._create_default_https_context = ssl._create_unverified_context
 
-    @staticmethod
-    def __install_basic_auth_handler(url, username, password):
-        password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-        password_mgr.add_password(None, url, username, password)
-        handler = urllib.request.HTTPBasicAuthHandler(password_mgr)
-        opener = urllib.request.build_opener(handler)
-        urllib.request.install_opener(opener)
-
     def __make_raw_request(self, *args, **kwargs):
+        if self.__username and self.__password:
+            header_value = f'{self.__username}:{self.__password}'
+            header_value = header_value.encode('ascii')
+            header_value = base64.b64encode(header_value)
+            header_value = header_value.decode('ascii')
+            header_value = f'Basic {header_value}'
+
+            if 'headers' in kwargs:
+                kwargs['headers']['Authorization'] = header_value
+            else:
+                kwargs['headers'] = {
+                    'Authorization': header_value
+                }
+
         request = urllib.request.Request(*args, **kwargs)
-        response = urllib.request.urlopen(request)
-        return response
+        try:
+            response = urllib.request.urlopen(request)
+            return response
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                print(e.file.read())
+                print(e.headers)
+            raise e
+
 
     def __make_binary_request(self, *args, **kwargs):
         response = self.__make_raw_request(*args, **kwargs)
@@ -125,17 +138,15 @@ class DockerRegistry:
     def upload_manifest(self, repo, tag, manifest):
         data = json.dumps(manifest, indent=4).encode()
         
-        try:
-            self.__make_raw_request(
-                f'{self.__url}/v2/{repo}/manifests/{tag}',
-                method='PUT',
-                headers={
-                    'Content-Type': 'application/vnd.docker.distribution.manifest.v2+json'
-                },
-                data=data
-            )
-        except urllib.error.HTTPError as e:
-            print(e.file.read())
+        self.__make_raw_request(
+            f'{self.__url}/v2/{repo}/manifests/{tag}',
+            method='PUT',
+            headers={
+                'Content-Type': 'application/vnd.docker.distribution.manifest.v2+json'
+            },
+            data=data
+        )
+
 
 
 class DockerRegistryBackup:
