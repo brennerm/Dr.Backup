@@ -1,0 +1,8 @@
+language: python
+python:
+  - 3.7
+services:
+  - docker
+sudo: required
+script:
+  - python -m py_compile dr_backup/*.py
