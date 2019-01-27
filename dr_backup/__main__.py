@@ -6,6 +6,7 @@ import datetime
 import getpass
 import json
 import os
+import re
 import ssl
 import tarfile
 import tempfile
@@ -16,9 +17,16 @@ MANIFESTS_FOLDER = 'manifests'
 
 class DockerRegistry:
     def __init__(self, url, username=None, password=None, disable_ssl_verification=False):
-        self.__url = url
         self.__username = username
         self.__password = password
+
+        if re.match('^http(s)?://', url) is None:
+            protocol = self.__detect_protocol(url)
+            url = protocol + url
+        else:
+            self.__online_check(url)
+
+        self.__url = url
 
         if disable_ssl_verification:
             ssl._create_default_https_context = ssl._create_unverified_context
@@ -26,6 +34,23 @@ class DockerRegistry:
     @property
     def url(self):
         return self.__url
+
+    def __online_check(self, url):
+        self.__make_raw_request(
+            f'{url}/v2/',
+        )
+
+    def __detect_protocol(self, url):
+        for protocol in ['https', 'http']:
+            try:
+                self.__online_check(
+                    f'{protocol}://{url}'
+                )
+            except (urllib.error.HTTPError, urllib.error.URLError):
+                continue
+            return protocol + '://'
+        raise ValueError
+
 
     def __make_raw_request(self, *args, **kwargs):
         if self.__username and self.__password:
@@ -43,15 +68,8 @@ class DockerRegistry:
                 }
 
         request = urllib.request.Request(*args, **kwargs)
-        try:
-            response = urllib.request.urlopen(request)
-            return response
-        except urllib.error.HTTPError as e:
-            if e.code != 404:
-                print(e.file.read())
-                print(e.headers)
-            raise e
-
+        response = urllib.request.urlopen(request)
+        return response
 
     def __make_binary_request(self, *args, **kwargs):
         response = self.__make_raw_request(*args, **kwargs)
