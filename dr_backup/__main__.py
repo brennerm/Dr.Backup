@@ -17,8 +17,15 @@ MANIFESTS_FOLDER = 'manifests'
 
 class DockerRegistry:
     def __init__(self, url, username=None, password=None, disable_ssl_verification=False):
-        self.__username = username
-        self.__password = password
+        if disable_ssl_verification:
+            ssl._create_default_https_context = ssl._create_unverified_context
+
+        self.__basic_auth_string = None
+        if username and password:
+            self.__basic_auth_string = DockerRegistry.__generate_basic_auth_string(
+                username,
+                password
+            )
 
         if re.match('^http(s)?://', url) is None:
             protocol = self.__detect_protocol(url)
@@ -28,12 +35,17 @@ class DockerRegistry:
 
         self.__url = url
 
-        if disable_ssl_verification:
-            ssl._create_default_https_context = ssl._create_unverified_context
-
     @property
     def url(self):
         return self.__url
+
+    @staticmethod
+    def __generate_basic_auth_string(username, password):
+        header_value = f'{username}:{password}'
+        header_value = header_value.encode('ascii')
+        header_value = base64.b64encode(header_value)
+        header_value = header_value.decode('ascii')
+        return f'Basic {header_value}'
 
     def __online_check(self, url):
         self.__make_raw_request(
@@ -53,18 +65,12 @@ class DockerRegistry:
 
 
     def __make_raw_request(self, *args, **kwargs):
-        if self.__username and self.__password:
-            header_value = f'{self.__username}:{self.__password}'
-            header_value = header_value.encode('ascii')
-            header_value = base64.b64encode(header_value)
-            header_value = header_value.decode('ascii')
-            header_value = f'Basic {header_value}'
-
+        if self.__basic_auth_string:
             if 'headers' in kwargs:
-                kwargs['headers']['Authorization'] = header_value
+                kwargs['headers']['Authorization'] = self.__basic_auth_string
             else:
                 kwargs['headers'] = {
-                    'Authorization': header_value
+                    'Authorization': self.__basic_auth_string
                 }
 
         request = urllib.request.Request(*args, **kwargs)
