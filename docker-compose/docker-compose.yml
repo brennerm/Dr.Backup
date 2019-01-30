@@ -1,0 +1,65 @@
+version: '3'
+services:
+  source-registry:
+    image: registry:2
+    ports:
+      - '127.0.0.1:5000:5000'
+  target-registry:
+    image: registry:2
+    ports:
+      - '127.0.0.1:5001:5000'
+  protected-source-registry:
+    image: registry:2
+    ports:
+      - '127.0.0.1:5002:5000'
+    environment:
+      - REGISTRY_AUTH=htpasswd
+      - REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm
+      - REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd
+      - REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt
+      - REGISTRY_HTTP_TLS_KEY=/certs/domain.key
+    volumes:
+      - .auth:/auth:ro
+      - .certs:/certs:ro
+  protected-target-registry:
+    image: registry:2
+    ports:
+      - '127.0.0.1:5003:5000'
+    environment:
+      - REGISTRY_AUTH=htpasswd
+      - REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm
+      - REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd
+      - REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt
+      - REGISTRY_HTTP_TLS_KEY=/certs/domain.key
+    volumes:
+      - .auth:/auth:ro
+      - .certs:/certs:ro
+  oauth-source-registry:
+    image: registry:2
+    ports:
+      - '127.0.0.1:5004:5000'
+    volumes:
+        - .docker_auth_config:/var/lib/registry/oauth_certs:ro
+    environment:
+      - REGISTRY_AUTH_TOKEN_REALM="https://localhost:6000/auth"
+      - REGISTRY_AUTH_TOKEN_SERVICE="Docker registry"
+      - REGISTRY_AUTH_TOKEN_ISSUER="Registry auth server"
+      - REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE="/var/lib/registry/oauth_certs/server.pem"
+  oauth-target-registry:
+    image: registry:2
+    ports:
+      - '127.0.0.1:5005:5000'
+    volumes:
+        - .docker_auth_config:/var/lib/registry/oauth_certs:ro
+    environment:
+      - REGISTRY_AUTH_TOKEN_REALM="https://localhost:6000/auth"
+      - REGISTRY_AUTH_TOKEN_SERVICE="Docker registry"
+      - REGISTRY_AUTH_TOKEN_ISSUER="Registry auth server"
+      - REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE="/var/lib/registry/oauth_certs/server.pem"
+  oauth2-server:
+    image: cesanta/docker_auth:latest
+    ports:
+      - '127.0.0.1:6000:5001'
+    volumes:
+      - .docker_auth_config:/config:ro
+

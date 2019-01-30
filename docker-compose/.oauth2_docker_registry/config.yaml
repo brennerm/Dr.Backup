@@ -1,0 +1,6 @@
+auth:
+  token:
+    realm: "https://oauth2-server:5001/auth"
+    service: "Docker registry"
+    issuer: "Registry auth server"
+    rootcertbundle: "/path/to/server.pem"
