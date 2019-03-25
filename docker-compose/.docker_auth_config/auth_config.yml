@@ -1,11 +1,11 @@
 server:
   addr: ":5001"
-  certificate: "/config/server.pem"
-  key: "/config/server.key"
 
 token:
   issuer: "Registry auth server"  # Must match issuer in the Registry config.
   expiration: 900
+  certificate: "/config/server.pem"
+  key: "/config/server.key"
 
 users:
   # Password is specified as a BCrypt hash. Use `htpasswd -nB USERNAME` to generate.

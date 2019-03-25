@@ -42,12 +42,10 @@ services:
       - .docker_auth_config:/var/lib/registry/oauth_certs:ro
       - .certs:/certs:ro
     environment:
-      - REGISTRY_AUTH_TOKEN_REALM="https://localhost:6000/auth"
+      - REGISTRY_AUTH_TOKEN_REALM="http://localhost:6000/auth"
       - REGISTRY_AUTH_TOKEN_SERVICE="Docker registry"
       - REGISTRY_AUTH_TOKEN_ISSUER="Registry auth server"
       - REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE="/var/lib/registry/oauth_certs/server.pem"
-      - REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt
-      - REGISTRY_HTTP_TLS_KEY=/certs/domain.key
   oauth-target-registry:
     image: registry:2
     ports:
@@ -56,12 +54,10 @@ services:
       - .docker_auth_config:/var/lib/registry/oauth_certs:ro
       - .certs:/certs:ro
     environment:
-      - REGISTRY_AUTH_TOKEN_REALM="https://localhost:6000/auth"
+      - REGISTRY_AUTH_TOKEN_REALM="http://localhost:6000/auth"
       - REGISTRY_AUTH_TOKEN_SERVICE="Docker registry"
       - REGISTRY_AUTH_TOKEN_ISSUER="Registry auth server"
       - REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE="/var/lib/registry/oauth_certs/server.pem"
-      - REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt
-      - REGISTRY_HTTP_TLS_KEY=/certs/domain.key
   oauth2-server:
     image: cesanta/docker_auth:latest
     ports:

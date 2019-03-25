@@ -20,12 +20,9 @@ class DockerRegistry:
         if disable_ssl_verification:
             ssl._create_default_https_context = ssl._create_unverified_context
 
-        self.__basic_auth_string = None
+        self.__auth_value = None
         if username and password:
-            self.__basic_auth_string = DockerRegistry.__generate_basic_auth_string(
-                username,
-                password
-            )
+            self.__auth_value = self.__get_authorization_value(url, username, password)
 
         if re.match('^http(s)?://', url) is None:
             protocol = self.__detect_protocol(url)
@@ -47,6 +44,55 @@ class DockerRegistry:
         header_value = header_value.decode('ascii')
         return f'Basic {header_value}'
 
+    @staticmethod
+    def __get_oauth_token(www_auth_value, username, password):
+        oauth_string = www_auth_value.replace('Bearer ', '')
+        print(oauth_string)
+        oauth_values = oauth_string.split(',')
+
+        oauth_config = {}
+        for oauth_value in oauth_values:
+            key, value = oauth_value.split('=')
+            oauth_config[key] = value.strip('"')
+
+        params = {
+            'acccount': username,
+            'client_id': 'docker',
+            'offline_token': True,
+            'scope': 'registry:catalog:*',
+            'service': oauth_config['service']
+        }
+
+        auth_header_value = DockerRegistry.__generate_basic_auth_string(username, password)
+
+        request = urllib.request.Request(
+            oauth_config['realm'] + '?' + urllib.parse.urlencode(params),
+            headers={
+                'Authorization': auth_header_value
+            }
+        )
+
+        response = urllib.request.urlopen(request)
+        response_json = json.load(response)
+        print(response_json)
+        return 'Bearer ' + response_json['token']
+
+    def __get_authorization_value(self, url, username, password):
+        try:
+            response = self.__make_raw_request(
+                f'{url}/v2/',
+            )
+            return None
+        except urllib.error.HTTPError as response:
+            www_auth_value = response.info()['Www-Authenticate']
+            
+        if www_auth_value.startswith('Basic'):
+            return DockerRegistry.__generate_basic_auth_string(username, password)
+        elif www_auth_value.startswith('Bearer'):
+            return DockerRegistry.__get_oauth_token(www_auth_value, username, password)
+        else:
+            raise NotImplementedError(f'No authentication for {www_auth_value} implemented')
+
     def __online_check(self, url):
         self.__make_raw_request(
             f'{url}/v2/',
@@ -65,12 +111,12 @@ class DockerRegistry:
 
 
     def __make_raw_request(self, *args, **kwargs):
-        if self.__basic_auth_string:
+        if self.__auth_value:
             if 'headers' in kwargs:
-                kwargs['headers']['Authorization'] = self.__basic_auth_string
+                kwargs['headers']['Authorization'] = self.__auth_value
             else:
                 kwargs['headers'] = {
-                    'Authorization': self.__basic_auth_string
+                    'Authorization': self.__auth_value
                 }
 
         request = urllib.request.Request(*args, **kwargs)
